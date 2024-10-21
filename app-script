@@ -1,0 +1,79 @@
+function createDocumentsAndFolders() {
+  var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = spreadsheet.getActiveSheet();
+  var sheetName = sheet.getName();
+  var parentFolder = DriveApp.getFileById(spreadsheet.getId()).getParents().next();
+  
+  // Check if Content folder already exists
+  var contentFolder;
+  var folders = parentFolder.getFolders();
+  while (folders.hasNext()) {
+    var folder = folders.next();
+    if (folder.getName() === "Content") {
+      contentFolder = folder;
+      break;
+    }
+  }
+  
+  // If Content folder doesn't exist, create it
+  if (!contentFolder) {
+    contentFolder = parentFolder.createFolder("Content");
+  }
+  
+  // Check if sheet folder already exists
+  var sheetFolder;
+  var sheetFolders = contentFolder.getFolders();
+  while (sheetFolders.hasNext()) {
+    var folder = sheetFolders.next();
+    if (folder.getName() === sheetName) {
+      sheetFolder = folder;
+      break;
+    }
+  }
+  
+  // If sheet folder doesn't exist, create it
+  if (!sheetFolder) {
+    sheetFolder = contentFolder.createFolder(sheetName);
+  }
+  
+  var lastRow = sheet.getLastRow();
+  var dataRange = sheet.getRange(2, 1, lastRow - 1, 3); // Assuming data starts from row 2, columns A, B, and C
+  var data = dataRange.getValues();
+
+  for (var i = 0; i < data.length; i++) {
+    var row = data[i];
+    var documentName = row[1]; // Get document name from column B
+    var folderName = row[1]; // Get folder name from column B
+    var content = row[2]; // Content to be placed in the document (column C)
+    
+    // Check if document already exists
+    var existingFiles = sheetFolder.getFilesByName(documentName);
+    var document;
+    if (existingFiles.hasNext()) {
+      document = DocumentApp.openById(existingFiles.next().getId());
+    } else {
+      // Create document if it doesn't exist
+      document = DocumentApp.create(documentName);
+      DriveApp.getFileById(document.getId()).moveTo(sheetFolder);
+    }
+    
+    var documentLink = document.getUrl();
+    sheet.getRange(i + 2, 3).setValue(documentLink); // Put document link in column C
+    
+    // Check if subfolder already exists
+    var existingFolders = sheetFolder.getFoldersByName(folderName);
+    var subFolder;
+    if (existingFolders.hasNext()) {
+      subFolder = existingFolders.next();
+    } else {
+      // Create subfolder if it doesn't exist
+      subFolder = sheetFolder.createFolder(folderName);
+    }
+    sheet.getRange(i + 2, 4).setValue(subFolder.getUrl()); // Put folder link in column D
+    
+    // Place content in the document (overwriting any existing content)
+    var body = document.getBody();
+    body.clear();
+    body.appendParagraph(content);
+  }
+}
